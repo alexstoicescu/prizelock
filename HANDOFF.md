@@ -52,6 +52,8 @@ State machine: `Created → Funded → Awarded` (terminal) or `Created → Funde
 - `CLAUDE.md` — Claude Code entry point; defers to `AGENTS.md` and this file.
 - `DEMO.md` — non-developer walkthrough of the local app.
 - `BASE_SEPOLIA.md` — preparation guide for a future testnet deploy. Read before any testnet work; **nothing is deployed yet**.
+- `PRE_TESTNET_CHECKLIST.md` — go/no-go decision aid for Base Sepolia. Current status: **NO-GO** (local-only by design until the project owner authorizes a deploy).
+- `SECURITY.md` — secrets and env-handling rules. Read before the first `git push` to GitHub.
 - `AGENT_LOG.md` — chronological milestones from this collaboration.
 - `packages/hardhat/contracts/PrizeLockEscrow.sol` — escrow contract.
 - `packages/hardhat/contracts/MockERC20.sol` — fake demo token, **intentionally public-mintable**.
