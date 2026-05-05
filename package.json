@@ -13,6 +13,7 @@
     "account:import": "yarn workspace @se-2/hardhat account:import",
     "account:reveal-pk": "yarn workspace @se-2/hardhat account:reveal-pk",
     "chain": "yarn hardhat:chain",
+    "ci": "yarn compile && yarn test && yarn next:build",
     "compile": "yarn hardhat:compile",
     "deploy": "yarn hardhat:deploy",
     "fork": "yarn hardhat:fork",

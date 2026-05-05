@@ -41,6 +41,7 @@ const STATUS_LABELS = ["Created", "Funded", "Awarded", "Refunded"];
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const TOKEN_DECIMALS = 18;
 const LOCAL_SUBMISSIONS_KEY = "prizelock-demo-submissions";
+const LOCAL_ACTIVE_BOUNTY_KEY = "prizelock-demo-active-bounty-id";
 
 const defaultDeadline = () => {
   const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000);
@@ -100,11 +101,24 @@ const Home: NextPage = () => {
     if (storedSubmissions) {
       setSubmissions(JSON.parse(storedSubmissions));
     }
+    // Restore the active bounty id so a refresh during the demo does not lose it.
+    const storedBountyId = window.localStorage.getItem(LOCAL_ACTIVE_BOUNTY_KEY);
+    if (storedBountyId && /^\d+$/.test(storedBountyId)) {
+      setActiveBountyId(storedBountyId);
+    }
   }, []);
 
   useEffect(() => {
     window.localStorage.setItem(LOCAL_SUBMISSIONS_KEY, JSON.stringify(submissions));
   }, [submissions]);
+
+  useEffect(() => {
+    if (activeBountyId) {
+      window.localStorage.setItem(LOCAL_ACTIVE_BOUNTY_KEY, activeBountyId);
+    } else {
+      window.localStorage.removeItem(LOCAL_ACTIVE_BOUNTY_KEY);
+    }
+  }, [activeBountyId]);
 
   const parsedPrizeAmount = useMemo(() => {
     try {

@@ -520,6 +520,19 @@ const deployedContracts = {
           type: "event",
         },
         {
+          inputs: [],
+          name: "MAX_METADATA_URI_LENGTH",
+          outputs: [
+            {
+              internalType: "uint256",
+              name: "",
+              type: "uint256",
+            },
+          ],
+          stateMutability: "view",
+          type: "function",
+        },
+        {
           inputs: [
             {
               internalType: "uint256",

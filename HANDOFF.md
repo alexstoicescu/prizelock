@@ -77,6 +77,9 @@ yarn compile
 yarn test
 yarn next:build
 yarn lint
+
+# One-shot aggregate of compile + test + next:build
+yarn ci
 ```
 
 ## Manual browser QA checklist
@@ -100,7 +103,7 @@ Walk through this whenever the contract or `page.tsx` changes. Two browser profi
 
 - **Single bounty in the UI.** No list view; only one bounty loaded by id at a time.
 - **Submissions are localStorage-only** under `prizelock-demo-submissions`. Different browsers / devices / incognito do not share them.
-- **`activeBountyId` is React state only.** Page refresh forgets it; users retype the id.
+- **`activeBountyId` is persisted to `localStorage`** under `prizelock-demo-active-bounty-id`, so a refresh keeps the active bounty loaded. Clearing site data still drops it.
 - **Deploy script always mints 1,000,000 PRIZE to the deployer.**
 - **`MockERC20.mint` is unrestricted.** Intentional — it is the demo faucet for fake tokens. **Do not add `Ownable` to `MockERC20`.**
 - **No reentrancy guard on the escrow.** Safe today: only `MockERC20` is in play and the contract follows checks-effects-interactions. Revisit only if/when arbitrary tokens are supported.
@@ -135,9 +138,7 @@ Do not introduce any of these without an explicit ask, even if they would be "ni
 In order of value vs. risk:
 
 1. **Browser-walk DEMO.md** end to end on a fresh checkout. Tighten any wording where the actual UI differs (burner-wallet confirm UX, Network row label exact string, Faucet button position at the demo viewport). Doc-only.
-2. **Persist `activeBountyId` to `localStorage`** so a refresh during a live demo does not drop the user. ~5-line frontend change. Keeps UX non-crypto-first.
-3. **Add a `yarn ci` script** that runs `yarn lint && yarn compile && yarn test && yarn next:build` so future agents have one command to verify the green-light state.
-4. **(Pre-testnet, when authorized)** Audit-shaped checklist: confirm checks-effects-interactions on every state transition; consider a `ReentrancyGuard` if non-`MockERC20` tokens are ever supported; decide whether to split the demo-mint step out of the deploy script before any non-local deploy.
+2. **(Pre-testnet, when authorized)** Audit-shaped checklist: confirm checks-effects-interactions on every state transition; consider a `ReentrancyGuard` if non-`MockERC20` tokens are ever supported; decide whether to split the demo-mint step out of the deploy script before any non-local deploy.
 
 Out of scope until the project owner explicitly asks: Safe, Privy, Splits, Biconomy, ZeroDev, Supabase, any database, any auth, any backend service, mainnet/testnet deploy, real ERC20s.
 

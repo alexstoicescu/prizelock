@@ -151,7 +151,7 @@ These are intentional shortcuts for the MVP. Do not be surprised by them.
 
 - **One bounty at a time in the UI.** The page loads one bounty by id. There is no list view or search.
 - **Submissions are browser-local.** They are stored in `localStorage` under `prizelock-demo-submissions`. Different browsers, devices, or incognito windows do not share submissions. Clearing site data wipes them.
-- **A page refresh forgets the active bounty id.** Type it back into "Load bounty ID" (it is `1` after a fresh deploy, then increments).
+- **The active bounty id is remembered across page refreshes** in `localStorage` (key `prizelock-demo-active-bounty-id`). Clearing site data or switching browsers drops it; type it back into "Load bounty ID" (it is `1` after a fresh deploy, then increments).
 - **The deploy script mints 1,000,000 PRIZE to the deployer** every time. Useful for demos, but means anyone running deploy locally is instantly "rich".
 - **`MockERC20` is open-mint.** Anyone can mint any amount to any address. This is fine because the token only exists locally — but it means PrizeLock is **not safe to deploy to a public chain as-is**.
 - **No reentrancy guard on the escrow.** Safe today because the only token in play is the plain OpenZeppelin `MockERC20`, but any future support for arbitrary tokens should add `ReentrancyGuard`.
@@ -184,7 +184,7 @@ The allowance has to fully confirm before the Fund button enables. Wait a couple
 Either (a) the connected wallet is not the judge, (b) no submission is selected, (c) the bounty is not in `Funded` status. The page shows the reason inline.
 
 **The page lost my bounty after a refresh.**
-Type the bounty id (e.g. `1`) into "Load bounty ID". The Bounty Status card will repopulate from the contract.
+The active bounty id is now remembered in `localStorage`, so refresh alone should not drop it. If you cleared site data or switched browsers, type the bounty id (e.g. `1`) back into "Load bounty ID" and the Bounty Status card will repopulate from the contract.
 
 **`yarn deploy` fails with "PrizeLock MVP deploy is local-only".**
 This is on purpose. The deploy script refuses to run against any network that is not `hardhat` or `localhost`.
