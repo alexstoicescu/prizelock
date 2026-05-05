@@ -21,3 +21,14 @@ node_modules
 
 # cli
 dist
+
+# env files (defensive root-level catch-all; package-level .gitignores cover the real ones)
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# secret-bearing files
+*.pem
+*.key
+secrets.json
