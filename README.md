@@ -19,7 +19,7 @@ A minimal hackathon bounty payout demo. A sponsor locks prize tokens in escrow, 
 
 ## What PrizeLock is
 
-A normal-looking hackathon bounty platform where the only crypto piece is a small escrow smart contract. The frontend looks like a regular web app — wallets only appear in the UI where escrow funding or payout actually require them. Sponsors and hackers don't need to know or care that there is a smart contract under the hood; the judge clicks one button and the prize is paid.
+A very simple hackathon bounty platform where the only crypto piece is a small escrow smart contract. The frontend looks like a regular web app — wallets only appear in the UI where escrow funding or payout actually require them. Sponsors and hackers don't need to know or care that there is a smart contract under the hood; the judge clicks one button and the prize is paid.
 
 The MVP exists to prove **one** thing: a sponsor can lock prize funds, a judge can pick a winner, and the winner is paid — provably, with no operator in the middle holding the money.
 
