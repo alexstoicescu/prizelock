@@ -26,6 +26,9 @@ contract PrizeLockEscrow {
         string metadataURI;
     }
 
+    // Cap metadataURI to keep gas predictable and avoid unbounded calldata in createBounty.
+    uint256 public constant MAX_METADATA_URI_LENGTH = 512;
+
     uint256 public nextBountyId = 1;
     mapping(uint256 bountyId => Bounty) private bounties;
 
@@ -53,6 +56,7 @@ contract PrizeLockEscrow {
         require(token != address(0), "Token is zero address");
         require(amount > 0, "Amount is zero");
         require(deadline > block.timestamp, "Deadline must be future");
+        require(bytes(metadataURI).length <= MAX_METADATA_URI_LENGTH, "Metadata URI too long");
 
         bountyId = nextBountyId;
         nextBountyId += 1;

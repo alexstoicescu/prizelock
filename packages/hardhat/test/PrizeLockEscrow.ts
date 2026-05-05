@@ -98,6 +98,30 @@ describe("PrizeLockEscrow", function () {
     expect(bounty.metadataURI).to.equal(metadataURI);
   });
 
+  it("accepts a metadataURI at the maximum length", async function () {
+    const { sponsor, judge, token, escrow, deadline } = await deployFixture();
+
+    const maxLength = Number(await escrow.MAX_METADATA_URI_LENGTH());
+    const longUri = "a".repeat(maxLength);
+
+    await expect(
+      escrow.connect(sponsor).createBounty(judge.address, await token.getAddress(), prizeAmount, deadline, longUri),
+    ).to.emit(escrow, "BountyCreated");
+
+    expect((await escrow.getBounty(1n)).metadataURI).to.equal(longUri);
+  });
+
+  it("rejects a metadataURI over the maximum length", async function () {
+    const { sponsor, judge, token, escrow, deadline } = await deployFixture();
+
+    const maxLength = Number(await escrow.MAX_METADATA_URI_LENGTH());
+    const tooLongUri = "a".repeat(maxLength + 1);
+
+    await expect(
+      escrow.connect(sponsor).createBounty(judge.address, await token.getAddress(), prizeAmount, deadline, tooLongUri),
+    ).to.be.revertedWith("Metadata URI too long");
+  });
+
   it("funds a bounty with MockERC20", async function () {
     const { sponsor, token, escrow, bountyId } = await createBountyFixture();
 

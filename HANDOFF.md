@@ -1,118 +1,145 @@
 # PrizeLock Handoff
 
-Snapshot of the project as of the takeover from Codex. Updated 2026-05-05.
+Single source of truth for handoffs between Codex and Claude Code. Keep this short, current, and honest.
 
-## What works today
+Last updated: 2026-05-05.
 
-A local-only MVP of the full bounty payout flow. Verified by:
+## Project summary
 
-- 13 Hardhat tests passing (`yarn test`).
-- Next.js production build passing (`yarn next:build`).
-- Manual browser QA at `http://127.0.0.1:3000` covering create → fund → submit → award → payout.
+PrizeLock is a hackathon bounty payout app. The whole product is one flow:
 
-The escrow contract `PrizeLockEscrow` and the `MockERC20` demo token are deployed automatically by `packages/hardhat/deploy/00_deploy_prizelock.ts` and the deploy script also mints 1,000,000 PRIZE to the deployer for easy testing. The deploy script refuses to run on anything other than `hardhat` / `localhost`.
+1. Sponsor creates a bounty.
+2. Sponsor approves and funds ERC20 prize money into escrow.
+3. Hackers add project submissions (off-chain, browser-only).
+4. Judge picks one winner.
+5. Escrow releases the full prize to the winner's payout wallet.
 
-The single-page UI in `packages/nextjs/app/page.tsx` is the entire frontend. It has sections for Sponsor, Hacker, Judge, Bounty Status, and Refund. Project submissions are stored only in `localStorage` (key: `prizelock-demo-submissions`) and never touch the chain.
+The app should look like a normal hackathon bounty platform. The smart contract is only the escrow / payout layer. Do not make it more crypto-first than it already is. Wallets should appear in the UI only where escrow funding or payout actually requires them.
 
-## How to run locally
+## Stack
 
-You need three terminals. From the repo root:
+- **Scaffold-ETH 2** (Hardhat flavor), Yarn workspaces.
+- **Contracts:** Solidity 0.8.30, OpenZeppelin (`IERC20`, `SafeERC20`, `ERC20`).
+- **Frontend:** Next.js App Router, RainbowKit, Wagmi, Viem, Tailwind/DaisyUI.
+- **Local chain only** for now (`hardhat` / `localhost`, chain id 31337). The deploy script throws on any other network.
 
-```bash
-# terminal 1
-yarn chain
+## Current verified working state (2026-05-05)
 
-# terminal 2
-yarn deploy
+- `yarn compile` — passes.
+- `yarn test` — **15 passing** (was 13; added 2 for `metadataURI` length validation).
+- `yarn next:build` — passes (one upstream `@coinbase/cdp-sdk` "Critical dependency" warning is known and harmless).
+- Manual browser QA at `http://127.0.0.1:3000` previously confirmed end-to-end:
+  mint fake PRIZE → create bounty → approve escrow → fund → add off-chain submission → select winner → release prize → status `Awarded` → payout tx hash visible → balances update.
 
-# terminal 3
-yarn start
-```
+## Core user flow (and the code paths behind it)
 
-Then open `http://127.0.0.1:3000`.
+| Step | UI button | Contract call |
+|---|---|---|
+| Mint demo token | "Mint fake demo money" | `MockERC20.mint(connectedAddress, 10_000e18)` |
+| Create bounty | "Create bounty" | `PrizeLockEscrow.createBounty(judge, token, amount, deadline, metadataURI)` |
+| Approve escrow | "Approve prize escrow" | `MockERC20.approve(escrow, amount)` |
+| Fund escrow | "Fund prize escrow" | `PrizeLockEscrow.fundBounty(bountyId)` |
+| Add submission | "Add project submission" | none (`localStorage` only) |
+| Release prize | "Release prize" | `PrizeLockEscrow.awardWinner(bountyId, winner)` |
+| Refund sponsor | "Refund sponsor" | `PrizeLockEscrow.refundSponsor(bountyId)` (after deadline) |
 
-If this is a fresh checkout, run `yarn install` first.
+State machine: `Created → Funded → Awarded` (terminal) or `Created → Funded → Refunded` (terminal).
 
-## Full end-to-end flow to verify
+## Important files
 
-Use this as the smoke test after any change. Two browser wallets (or two browser profiles) make role-switching easier, but a single connected wallet can also play sponsor, judge, and winner.
-
-1. **Connect a wallet** on the local Hardhat chain (chain id 31337).
-2. **Get gas:** click the floating **Faucet** button at the bottom-left and send some local ETH to the connected wallet so it can pay gas.
-3. **Mint fake demo money:** click "Mint fake demo money". The wallet PRIZE balance should jump by 10,000.
-4. **Create bounty:** fill in judge wallet, prize token (the "Demo token" button autofills MockERC20), prize amount (e.g. 1000), deadline (defaults to one hour from now in *local time*), description. Click "Create bounty". `activeBountyId` will populate.
-5. **Approve escrow:** click "Approve prize escrow". The escrow allowance row should match the prize amount.
-6. **Fund prize escrow:** click "Fund prize escrow". Bounty status flips to **Funded**. Wallet PRIZE balance drops by the prize amount.
-7. **Add a submission:** in the Hacker section, enter a hacker name, payout wallet (the "Mine" button autofills the connected wallet), project URL, notes. Click "Add project submission".
-8. **Switch to the judge wallet** (or stay connected if the same wallet is judge).
-9. **Select a submission** via its radio button, then click **Release prize**. Bounty status flips to **Awarded**. The payout transaction hash appears in the green box and in the "Recent transaction hashes" section. The winner's PRIZE balance should equal the prize amount.
-10. **(Optional) Refund path:** create a second bounty, fund it, do not award, then wait until past the deadline and click **Refund sponsor**. Status flips to **Refunded** and PRIZE returns to the sponsor.
-
-## Recent fixes (do not regress)
-
-- **Fee-on-transfer protection.** `PrizeLockEscrow.fundBounty` now snapshots `balanceOf(escrow)` before the `transferFrom` and requires the delta to equal `bounty.amount`. Tokens that take a transfer fee (simulated by `MockFeeOnTransferERC20`) revert with `Incorrect token amount received`. See `packages/hardhat/contracts/PrizeLockEscrow.sol:81-87`.
-- **Test coverage added** for fee-on-transfer underfunding, non-sponsor funding, and non-sponsor refunding. See `packages/hardhat/test/PrizeLockEscrow.ts`.
-- **Frontend default deadline is local time.** `defaultDeadline()` in `packages/nextjs/app/page.tsx:45-52` adjusts for the timezone offset so the `<input type="datetime-local">` value is interpreted correctly when converted back to a unix timestamp. Without this fix, the contract sometimes reverted with `Deadline must be future`.
-- **Frontend faucet hint.** A small note in the Wallet section tells first-time users to fund the burner wallet with local ETH for gas before minting PRIZE.
-
-## Smart contract surface (small on purpose)
-
-`PrizeLockEscrow` exposes:
-
-- `createBounty(judge, token, amount, deadline, metadataURI) → bountyId`
-- `fundBounty(bountyId)` — sponsor-only; requires prior ERC20 approval; reverts on under-receipt
-- `awardWinner(bountyId, winner)` — judge-only; pays full prize and marks status `Awarded`
-- `refundSponsor(bountyId)` — sponsor-only; only after deadline; only while status is `Funded`
-- `getBounty(bountyId)` — view
-- `nextBountyId` — public counter, starts at 1
-
-States: `Created → Funded → Awarded` (terminal) or `Created → Funded → Refunded` (terminal).
-
-## Known limitations
-
-These are accepted for the MVP. Do not "fix" them without a request.
-
-- **Single bounty in the UI.** The frontend only loads one bounty at a time via `activeBountyId`. There is no list view.
-- **Submissions are localStorage-only.** They are not shared across browsers, devices, or sessions other than the current one. Clearing browser storage wipes them.
-- **No on-chain submission registry.** Judges trust whatever the frontend hands them as the payout wallet. If a malicious frontend swaps the wallet at award time, the judge would sign for the wrong address. Acceptable for a local demo.
-- **No reentrancy guard on the escrow.** Safe today because `MockERC20` is a plain OpenZeppelin ERC20 and the `await*Winner` / `refundSponsor` paths follow checks-effects-interactions (status is set before the transfer). Any change that introduces a non-trivial token would warrant `ReentrancyGuard`.
-- **No per-bounty cancellation before funding.** A bounty in `Created` cannot be archived; it just stays.
-- **Deploy script always mints 1,000,000 PRIZE to the deployer.** This is intentional for demos and would need to change before any non-local deployment.
-- **Local-only by design.** `00_deploy_prizelock.ts` throws on any network other than `hardhat` / `localhost`.
-- **Burner wallet UX.** Newly created burner wallets need ETH from the SE-2 faucet before they can mint PRIZE or send any tx. The UI hints at this but does not block.
-
-## Risks I noticed during inspection
-
-None require immediate action — flagging for awareness:
-
-1. **`metadataURI` is unbounded user input** stored on-chain. There is no size cap. Not a security issue, but extremely long strings will spike gas. Fine for a local demo; worth a `require(bytes(metadataURI).length <= N)` if this ever leaves localhost.
-2. **Frontend trusts a submission's `payoutWallet`.** The judge releases funds to whatever the selected submission says. Since submissions live in `localStorage` and anyone with browser access can edit them, the judge UI implicitly trusts the local browser state. Fine for a local demo; would need real submission attestation before going anywhere production-shaped.
-3. **`refundSponsor` button visibility.** It renders before the deadline has passed and the contract correctly rejects the call with `Deadline not passed`. The UI shows a small note explaining this, so behavior is correct, but a user clicking too early will see a transaction-reverted error rather than a disabled button.
-4. **No allowance reset path.** If a sponsor approves a large amount and then creates a smaller bounty, leftover allowance lingers. Harmless on a local demo but worth noting.
-5. **`MockERC20.mint` is unrestricted.** Anyone can mint to anyone. Intentional for demos; would obviously be removed in any real token.
-6. **`activeBountyId` lives only in React state.** A page refresh loses the active bounty selection. Users have to type the id back in (or recreate). Minor UX nit.
-
-## Recommended next steps (in priority order)
-
-These are suggestions, not authorizations. Confirm before doing any of them.
-
-1. **Lock down `yarn lint` / `yarn next:build` in CI** so future regressions are caught automatically. The repo has Husky configured (`.husky/`) — confirm a pre-push hook runs the test suite.
-2. **Persist `activeBountyId`** to `localStorage` so a page refresh during the demo doesn't drop the user. One-line change.
-3. **Add a `cancelBeforeFunding` path** to the escrow if the demo flow ever needs to clean up unfunded bounties. Currently low priority because nothing breaks.
-4. **Pin a copy of the demo script** (a literal narrated walkthrough) in `docs/` so the project owner can demo without the developer present. Pure docs work.
-5. **Once the local MVP is "frozen,"** decide what the *next* slice is — likely either (a) a sponsor multi-bounty list view or (b) on-chain submission registration so submissions survive browser refreshes. Either is a real feature and should be scoped against `SPEC.md` first.
-
-Out of scope until explicitly requested: Safe, Privy, Splits, Biconomy, ZeroDev, Supabase, any database, any auth, any backend service, mainnet/testnet deploy, real ERC20s.
-
-## Files to know
-
-- `SPEC.md` — product spec, non-goals, MVP scope.
-- `AGENTS.md` — durable agent guide, hard rules, stack, commands.
-- `CLAUDE.md` — Claude Code entry point, points at this file and `AGENTS.md`.
+- `SPEC.md` — product spec, non-goals, MVP scope. Read before any product change.
+- `AGENTS.md` — durable agent guide, hard rules, stack, commands. Read first.
+- `CLAUDE.md` — Claude Code entry point; defers to `AGENTS.md` and this file.
+- `DEMO.md` — non-developer walkthrough of the local app.
+- `AGENT_LOG.md` — chronological milestones from this collaboration.
 - `packages/hardhat/contracts/PrizeLockEscrow.sol` — escrow contract.
-- `packages/hardhat/contracts/MockERC20.sol` — demo PRIZE token.
+- `packages/hardhat/contracts/MockERC20.sol` — fake demo token, **intentionally public-mintable**.
 - `packages/hardhat/contracts/test/MockFeeOnTransferERC20.sol` — test-only fee token.
-- `packages/hardhat/test/PrizeLockEscrow.ts` — 13 tests, all passing.
-- `packages/hardhat/deploy/00_deploy_prizelock.ts` — local-only deploy + demo mint.
+- `packages/hardhat/test/PrizeLockEscrow.ts` — 15 tests, all passing.
+- `packages/hardhat/deploy/00_deploy_prizelock.ts` — local-only deploy + 1,000,000 PRIZE demo mint.
 - `packages/nextjs/app/page.tsx` — entire user-facing UI.
 - `packages/nextjs/contracts/deployedContracts.ts` — auto-generated ABIs after `yarn deploy`.
+- `packages/nextjs/scaffold.config.ts` — `targetNetworks: [chains.hardhat]`, burner-wallet local only.
+
+## Commands
+
+Run from the repo root.
+
+```bash
+# three-terminal local run
+yarn chain        # terminal 1: local Hardhat node
+yarn deploy       # terminal 2: deploy MockERC20 + PrizeLockEscrow, mint 1M demo PRIZE
+yarn start        # terminal 3: Next.js at http://127.0.0.1:3000
+
+# CI-shaped checks
+yarn compile
+yarn test
+yarn next:build
+yarn lint
+```
+
+## Manual browser QA checklist
+
+Walk through this whenever the contract or `page.tsx` changes. Two browser profiles make role-switching easier; one wallet playing all roles also works.
+
+1. Open `http://127.0.0.1:3000`. The yellow "Local demo money only" notice shows.
+2. Connect a burner wallet. Network row reads `Hardhat`.
+3. Use the **Faucet** button (bottom-left) to send local ETH to the burner wallet.
+4. Click **Mint fake demo money** → Wallet PRIZE balance jumps by 10,000.
+5. Fill the Sponsor form (use **Mine** for judge, **Demo token** for prize token, default 1000 prize, default 1h deadline). Click **Create bounty**. The "Load bounty ID" field auto-populates.
+6. Click **Approve prize escrow** → "Escrow allowance" matches the prize amount.
+7. Click **Fund prize escrow** → Bounty Status flips to **Funded**. Wallet PRIZE drops by the prize amount.
+8. Add a Hacker submission (use **Mine** for payout wallet). Card appears under Judge.
+9. Connected wallet must be the judge. Pick the submission's radio. Click **Release prize**.
+10. Verify: green "Winner selected and paid" box appears with payout tx hash. Bounty Status reads **Awarded**. Winner's PRIZE balance equals the prize amount.
+11. Optional: create a second bounty, fund it, do not award, advance past deadline (or wait), click **Refund sponsor**. Status flips to **Refunded**.
+12. Try a `metadataURI` longer than 512 bytes. Expect a revert ("Metadata URI too long") — this is the new pre-testnet hardening.
+
+## Known limitations (intentional, do not "fix" without an ask)
+
+- **Single bounty in the UI.** No list view; only one bounty loaded by id at a time.
+- **Submissions are localStorage-only** under `prizelock-demo-submissions`. Different browsers / devices / incognito do not share them.
+- **`activeBountyId` is React state only.** Page refresh forgets it; users retype the id.
+- **Deploy script always mints 1,000,000 PRIZE to the deployer.**
+- **`MockERC20.mint` is unrestricted.** Intentional — it is the demo faucet for fake tokens. **Do not add `Ownable` to `MockERC20`.**
+- **No reentrancy guard on the escrow.** Safe today: only `MockERC20` is in play and the contract follows checks-effects-interactions. Revisit only if/when arbitrary tokens are supported.
+- **Local-only.** The deploy script throws on any non-local network.
+- **`metadataURI` capped at 512 bytes** (added 2026-05-05).
+- **Burner wallets need local ETH for gas.** UX is hinted in the Wallet card.
+
+## Product constraints (durable rules)
+
+- Local demo only for now. No mainnet, no testnet, no real money.
+- Mock ERC20 only.
+- App must look like a normal hackathon bounty platform, not a wallet-first dApp.
+- Submissions stay off-chain until there is a clear product reason to move them.
+- Code must stay readable for a non-developer project owner. Short comments where a non-developer would need context.
+- Prefer one bundled, narrow change over multi-area refactors.
+
+## What not to add yet
+
+Do not introduce any of these without an explicit ask, even if they would be "nice":
+
+- Auth, user accounts, profiles, login systems
+- Databases or backend APIs (Supabase, Postgres, Firebase, etc.)
+- Smart-account / account-abstraction stacks: Safe, Privy, Biconomy, ZeroDev
+- Payment-splitting tooling: 0xSplits / Splits
+- Indexers, subgraphs, off-chain workers
+- Email, notifications, chat
+- Multi-winner, partial payouts, milestones, disputes, fees, multi-judge voting
+- Base Sepolia or any other live deploy
+
+## Next recommended tasks (not authorized — confirm before doing)
+
+In order of value vs. risk:
+
+1. **Browser-walk DEMO.md** end to end on a fresh checkout. Tighten any wording where the actual UI differs (burner-wallet confirm UX, Network row label exact string, Faucet button position at the demo viewport). Doc-only.
+2. **Persist `activeBountyId` to `localStorage`** so a refresh during a live demo does not drop the user. ~5-line frontend change. Keeps UX non-crypto-first.
+3. **Add a `yarn ci` script** that runs `yarn lint && yarn compile && yarn test && yarn next:build` so future agents have one command to verify the green-light state.
+4. **(Pre-testnet, when authorized)** Audit-shaped checklist: confirm checks-effects-interactions on every state transition; consider a `ReentrancyGuard` if non-`MockERC20` tokens are ever supported; decide whether to split the demo-mint step out of the deploy script before any non-local deploy.
+
+Out of scope until the project owner explicitly asks: Safe, Privy, Splits, Biconomy, ZeroDev, Supabase, any database, any auth, any backend service, mainnet/testnet deploy, real ERC20s.
+
+## Exact suggested next prompt for Codex
+
+> Walk through DEMO.md against the running PrizeLock app on a fresh checkout (`yarn install`, then `yarn chain`, `yarn deploy`, `yarn start` in three terminals). For each section — Sponsor flow, Hacker submission flow, Judge flow, Verify payout, Verify bounty status, Troubleshooting — confirm the wording exactly matches what the UI shows. Pay specific attention to: (a) whether the burner wallet shows a confirmation popup or auto-signs (DEMO.md currently says "Confirm the transaction in your wallet"), (b) the exact string in the Wallet card's `Network:` row, (c) the position of the SE-2 Faucet button at the resolution you intend to demo at. If the doc and UI disagree, fix DEMO.md only — do not change product code, contracts, deploy scripts, tests, frontend, or package config. Then run `yarn compile`, `yarn test`, and `yarn next:build` to confirm the repo is still green. Report files changed (doc-only), commands run, mismatches found, and the next recommended prompt.
