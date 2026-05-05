@@ -51,6 +51,7 @@ State machine: `Created → Funded → Awarded` (terminal) or `Created → Funde
 - `AGENTS.md` — durable agent guide, hard rules, stack, commands. Read first.
 - `CLAUDE.md` — Claude Code entry point; defers to `AGENTS.md` and this file.
 - `DEMO.md` — non-developer walkthrough of the local app.
+- `BASE_SEPOLIA.md` — preparation guide for a future testnet deploy. Read before any testnet work; **nothing is deployed yet**.
 - `AGENT_LOG.md` — chronological milestones from this collaboration.
 - `packages/hardhat/contracts/PrizeLockEscrow.sol` — escrow contract.
 - `packages/hardhat/contracts/MockERC20.sol` — fake demo token, **intentionally public-mintable**.
